@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow, noarchive">
+<title>會議紀錄管理系統</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Manrope:wght@500;600;700;800&display=swap">
+<link rel="stylesheet" href="css/app.css?v=20261114100000">
+</head>
+<body>
+<div class="shell">
+  <aside class="side" id="side" aria-label="主選單">
+    <div class="brand">
+      <div class="brand-t">裕信汽車 服務部</div>
+      <div class="brand-s">會議紀錄管理系統</div>
+    </div>
+    <nav id="nav"></nav>
+    <div class="side-foot" id="sideFoot"></div>
+  </aside>
+  <div class="main-col">
+    <header class="topbar">
+      <button type="button" class="menu-btn" id="menuBtn" aria-label="開關選單" aria-controls="side">☰</button>
+      <div class="top-title" id="topTitle">會議總覽</div>
+      <div class="top-meta" id="topMeta">—</div>
+      <div class="top-scope">
+        <label for="tpSel">類別</label>
+        <select id="tpSel"></select>
+        <label for="yrSel">年度</label>
+        <select id="yrSel"></select>
+      </div>
+    </header>
+    <main id="main" tabindex="-1"></main>
+  </div>
+</div>
+<div class="tip" id="tip" hidden></div>
+<script src="data/meetings.js?v=20261114100000"></script>
+<script src="js/app.js?v=20261114100000"></script>
+</body>
+</html>
