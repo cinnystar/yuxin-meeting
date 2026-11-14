@@ -340,15 +340,18 @@ function renderBoard(main){
     {l:'待辦事項',val:list.reduce((s,m)=>s+m.todos.length,0),sub:'項（會議紀錄中的待辦）'}
   ].filter(Boolean)));
 
+  // 版面：上排「最新會議｜各類別最新一場」→ 待辦事項 → 每月（歷年）會議場次
   const g=el('<div class="grid2"></div>');
+  const lp=el('<section class="panel"><div class="panel-h"><h2>最新會議</h2><p>最近 10 場</p></div></section>');
+  lp.append(meetingTable(list.slice(0,10)));
+  g.append(lp);
+  let cp;
   if(YEAR!=='all'){
-    const mp=el('<section class="panel"><div class="panel-h"><h2>每月會議場次</h2><p>依類別堆疊 · 點長條看該月清單</p></div></section>');
-    mp.append(stackChart(Array.from({length:12},(_,i)=>{const vals={};list.filter(m=>m.month===i+1).forEach(m=>vals[m.type]=(vals[m.type]||0)+1);return {label:(i+1)+'月',key:i+1,vals}}),tps,{onPick:m=>go('#/list?month='+m),hiKey:isCur?curM:null}));
-    g.append(mp);
+    cp=el('<section class="panel"><div class="panel-h"><h2>每月會議場次</h2><p>依類別堆疊 · 點長條看該月清單</p></div></section>');
+    cp.append(stackChart(Array.from({length:12},(_,i)=>{const vals={};list.filter(m=>m.month===i+1).forEach(m=>vals[m.type]=(vals[m.type]||0)+1);return {label:(i+1)+'月',key:i+1,vals}}),tps,{onPick:m=>go('#/list?month='+m),hiKey:isCur?curM:null}));
   }else{
-    const yp=el('<section class="panel"><div class="panel-h"><h2>歷年會議場次</h2><p>點長條切換年度</p></div></section>');
-    yp.append(stackChart(years().slice().reverse().map(y=>{const vals={};MEETINGS.filter(m=>m.year===y&&(!TYPE||m.type===TYPE)).forEach(m=>vals[m.type]=(vals[m.type]||0)+1);return {label:String(roc(y)),key:y,vals}}),tps,{onPick:y=>{setYear(y);route()}}));
-    g.append(yp);
+    cp=el('<section class="panel"><div class="panel-h"><h2>歷年會議場次</h2><p>點長條切換年度</p></div></section>');
+    cp.append(stackChart(years().slice().reverse().map(y=>{const vals={};MEETINGS.filter(m=>m.year===y&&(!TYPE||m.type===TYPE)).forEach(m=>vals[m.type]=(vals[m.type]||0)+1);return {label:String(roc(y)),key:y,vals}}),tps,{onPick:y=>{setYear(y);route()}}));
   }
   // 最近一個有開會（且有待辦）的月份，該月所有會議的待辦事項；新的月份開會後才換月（依右上角類別篩選）
   const lastM=MEETINGS.find(m=>m.date<=TODAY_S&&(!TYPE||m.type===TYPE)&&m.todos.length);
@@ -357,7 +360,7 @@ function renderBoard(main){
   const tp=el(`<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>${roc(+ym.slice(0,4))} 年 ${tm} 月所有會議（${monthMs.length} 場）· 依期限排序 · 點列看會議內容</p></div><div class="tbl-wrap"><table class="todo-t"><thead><tr><th class="l">期限</th><th class="l">交辦對象</th><th class="l">事項</th><th class="l">會議</th></tr></thead><tbody></tbody></table></div></section>`);
   const items=monthMs.flatMap(m=>m.todos.map(t=>({...parseTodo(t,m.date),m}))).sort((a,b)=>a.due.localeCompare(b.due)||(a.track-b.track)||a.m.date.localeCompare(b.m.date));
   const tb=tp.querySelector('tbody');
-  items.forEach(t=>{const tr=el(`<tr class="click"><td>${dueCell(t)}</td><td class="asg">${esc(t.who||'—')}</td><td class="l">${esc(t.task)}</td><td class="src">${typePill(t.m.type)}<br>${rocDate(t.m.date)}</td></tr>`);tr.onclick=()=>openMeeting(t.m.id);tb.append(tr)});
+  items.forEach(t=>{const tr=el(`<tr class="click"><td>${dueCell(t)}</td><td class="l asg">${esc(t.who||'—')}</td><td class="l">${esc(t.task)}</td><td class="l src">${typePill(t.m.type)}<br>${rocDate(t.m.date)}</td></tr>`);tr.onclick=()=>openMeeting(t.m.id);tb.append(tr)});
   if(!items.length)tb.innerHTML=`<tr><td colspan="4" class="empty">目前會議都沒有待辦事項</td></tr>`;
   // 各類別最新一場
   const lp0=el('<section class="panel"><div class="panel-h"><h2>各類別最新一場會議</h2><p>點項目看會議內容</p></div><div class="hits"></div></section>');
@@ -365,10 +368,7 @@ function renderBoard(main){
   g.append(lp0);
   main.append(g);
   main.append(tp);
-
-  const lp=el('<section class="panel"><div class="panel-h"><h2>最新會議</h2><p>最近 10 場</p></div></section>');
-  lp.append(meetingTable(list.slice(0,10)));
-  main.append(lp);
+  const g3=el('<div class="grid2 half"></div>');g3.append(cp);main.append(g3);
 }
 
 // ---------- 會議總表 ----------
