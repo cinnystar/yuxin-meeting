@@ -65,7 +65,8 @@ function dataJs(list){
 }
 
 // ---------- data ----------
-const BASE_TYPES=['廠長會議','服務部會議'];
+// 固定類別；新增時選「其他」輸入的名稱會自動加入類別清單
+const BASE_TYPES=['廠長會議','服務部會議','改善項目會議'];
 let OFFICIAL=[],PENDING=[],MEETINGS=[];
 function norm(m,pending){
   const files=(m.files||[]).map(f=>Array.isArray(f)?{name:f[0].split('/').pop(),path:f[0],size:f[1]}:f);
@@ -106,6 +107,79 @@ function todosOf(c){
   }
   return out;
 }
+// 待辦拆解：「各廠長：11月13日內完成…」→ 交辦對象、期限（取最後一天）、事項
+const ymd=(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+const lastDay=(y,m)=>new Date(y,m,0).getDate();
+function parseTodo(text,mDate){
+  let who='',task=text;
+  const w=/^([^：:]{1,14})[：:]\s*(.+)$/.exec(text);
+  if(w){who=w[1].trim();task=w[2].trim()}
+  const my=+mDate.slice(0,4),mm=+mDate.slice(5,7);
+  const yOf=m=>m<mm-6?my+1:my;
+  let due='',dueTxt='';
+  let r=/(\d{1,2})月(\d{1,2})日?\s*(?:[至到~～－–-]\s*(?:(\d{1,2})月)?(\d{1,2})日?)?/.exec(task);
+  if(r){const m1=+r[1],d1=+r[2],m2=r[3]?+r[3]:m1,d2=r[4]?+r[4]:null;
+    due=ymd(yOf(m2),m2,d2||d1);dueTxt=d2?`${m1}/${d1}–${m2!==m1?m2+'/':''}${d2}`:`${m1}/${d1}`}
+  else if((r=/(\d{1,2})月(底|初|中)/.exec(task))){const m1=+r[1],y=yOf(m1),d=r[2]==='底'?lastDay(y,m1):r[2]==='初'?5:15;due=ymd(y,m1,d);dueTxt=`${m1}月${r[2]}`}
+  // 沒寫日期＝持續追蹤，期限算到會議當月月底
+  let track=false;
+  if(!due){track=true;const d=lastDay(my,mm);due=ymd(my,mm,d);dueTxt=`${mm}/${d}`}
+  return {who,task,due,dueTxt,track};
+}
+function dueCell(t){
+  return `<span class="due">${esc(t.dueTxt)}${t.track?'<small>持續追蹤</small>':''}</span>`;
+}
+// ---------- 貼上轉換：Notion／網頁／Word 的 HTML 或純文字 → ## / ### / - 格式 ----------
+const HEAD_MAP={'action items':'待辦事項','action item':'待辦事項','next steps':'待辦事項','decisions':'決議事項','open questions':'待釐清問題','questions':'待釐清問題','summary':'會議摘要','notes':'筆記','key takeaways':'重點摘要','agenda':'議程'};
+const mapHead=s=>HEAD_MAP[s.trim().toLowerCase()]||s.trim();
+// Notion AI 摘要的引用編號（例：「…回報 1​」「… 2 3​」）
+const cleanCite=s=>String(s).replace(/[\s ]*(?:\d{1,3}[\s ]*)+​/g,'').replace(/[​‌‍﻿]/g,'').replace(/[\s ]+/g,' ').trim();
+function htmlToMd(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  doc.querySelectorAll('script,style,meta,link,sup,[class*=citation],[class*=footnote]').forEach(x=>x.remove());
+  const out=[];
+  const isList=e=>/^(UL|OL)$/.test(e.tagName);
+  const cls=e=>String(e.className||'');
+  const isHead=e=>/^H[1-6]$/.test(e.tagName)||/header-block/.test(cls(e));
+  const isItem=e=>e.tagName==='LI'||/(bulleted_list|numbered_list|to_do|toggle)-block/.test(cls(e));
+  const isBlock=e=>isList(e)||isHead(e)||isItem(e)||/^(P|DIV|TABLE|SECTION|BLOCKQUOTE|PRE)$/.test(e.tagName);
+  // 只取這一層的文字，不含子清單／子區塊
+  const inline=e=>{let s='';e.childNodes.forEach(n=>{if(n.nodeType===3)s+=n.textContent;else if(n.nodeType===1){if(n.tagName==='BR')s+=' ';else if(!isBlock(n)||(n.tagName==='DIV'&&!n.querySelector('ul,ol,li,p,h1,h2,h3,h4,[class*=-block]')))s+=n.textContent}});return cleanCite(s)};
+  const level=e=>{const m=/^H(\d)$/.exec(e.tagName);if(m)return +m[1];const c=cls(e);return /sub_sub_header/.test(c)?3:/sub_header/.test(c)?2:1};
+  const walk=(node,depth)=>{
+    for(const c of node.children){
+      if(isHead(c)){const t=cleanCite(c.textContent);if(t)out.push((level(c)<=2?'## ':'### ')+mapHead(t));continue}
+      if(isList(c)){walk(c,depth);continue}
+      if(isItem(c)){const t=inline(c);if(t)out.push('  '.repeat(depth)+'- '+t);walk(c,depth+(t?1:0));continue}
+      if(c.tagName==='P'||/text-block/.test(cls(c))){const t=inline(c);if(t)out.push(depth?'  '.repeat(depth-1)+'- '+t:(HEAD_MAP[t.toLowerCase()]?'## '+mapHead(t):t));walk(c,depth);continue}
+      if(c.tagName==='TR'){const t=[...c.children].map(x=>cleanCite(x.textContent)).filter(Boolean).join('｜');if(t)out.push('- '+t);continue}
+      if(c.children.length)walk(c,depth);
+      else{const t=cleanCite(c.textContent);if(t&&/^(DIV|SPAN|TD)$/.test(c.tagName))out.push(depth?'  '.repeat(depth-1)+'- '+t:t)}
+    }
+  };
+  walk(doc.body,0);
+  return out.join('\n');
+}
+// 純文字整理：去掉引用編號；英文段落名改中文大標題；「•」「・」「*」開頭改成「- 」
+// 段落標題底下的一般行視為項目；「會議摘要」段落中沒有引用編號的短行視為小標題（Notion AI 摘要的寫法）
+function tidyText(t){
+  let sec='';
+  return String(t).replace(/\r/g,'').split('\n').map(l=>{
+    const ind=(/^[ \t]*/.exec(l)[0]).replace(/\t/g,'  ');
+    const cited=/\d[\s ]*​/.test(l);
+    let s=cleanCite(l);
+    if(!s)return '';
+    const h=/^(#{2,3})\s+(.*)$/.exec(s);
+    if(h){if(h[1]==='##')sec=h[2];return s}
+    if(/^-\s/.test(s))return ind+s;
+    if(HEAD_MAP[s.toLowerCase()]){sec=mapHead(s);return '## '+sec}
+    const b=/^[•・●▪◦*‧]\s*(.*)$/.exec(s);if(b)return ind+'- '+b[1];
+    const n=/^\d{1,2}[.、)]\s*(.*)$/.exec(s);if(n&&n[1])return ind+'- '+n[1];
+    if(!sec)return ind?ind+'- '+s:s;
+    if(/摘要|筆記/.test(sec)&&!cited&&!ind&&s.length<=20&&!/[。；，]$/.test(s))return '### '+s;
+    return ind+'- '+s;
+  }).join('\n').replace(/\n{3,}/g,'\n\n').trim();
+}
 function renderMd(c,hl){
   const lines=String(c||'').replace(/\r/g,'').split('\n');
   let html='',depth=0,todo=false;
@@ -119,7 +193,8 @@ function renderMd(c,hl){
       const lv=Math.min(3,Math.floor(li[1].replace(/\t/g,'  ').length/2)+1);
       if(lv>depth){while(depth<lv){html+=`<ul${depth===0&&todo?' class="todo"':''}><li>`;depth++}}
       else{close(lv);html+='</li><li>'}
-      html+=hlText(li[2],hl);continue;
+      const w=todo&&lv===1?/^([^：:]{1,14})([：:])(.*)$/.exec(li[2]):null;
+      html+=w?`<b class="who">${hlText(w[1],hl)}</b>${w[2]}${hlText(w[3],hl)}`:hlText(li[2],hl);continue;
     }
     close(0);html+=`<p>${hlText(raw.trim(),hl)}</p>`;
   }
@@ -275,14 +350,21 @@ function renderBoard(main){
     yp.append(stackChart(years().slice().reverse().map(y=>{const vals={};MEETINGS.filter(m=>m.year===y&&(!TYPE||m.type===TYPE)).forEach(m=>vals[m.type]=(vals[m.type]||0)+1);return {label:String(roc(y)),key:y,vals}}),tps,{onPick:y=>{setYear(y);route()}}));
     g.append(yp);
   }
-  // 最近一次會議的待辦事項（各類別最新一場）
-  const tp=el('<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>各類別最新一場會議 · 點項目看會議內容</p></div><div class="todos"></div></section>');
-  const latest=tps.map(t=>MEETINGS.find(m=>m.type===t&&m.todos.length)).filter(Boolean);
-  const tl=tp.querySelector('.todos');
-  latest.forEach(m=>m.todos.slice(0,8).forEach(t=>{const b=el(`<button type="button" class="todo-i"><span>☐</span><span>${esc(t)}</span><span class="m">${typePill(m.type)} ${rocDate(m.date)} ${esc(m.title)}</span></button>`);b.onclick=()=>openMeeting(m.id);tl.append(b)}));
-  if(!latest.length)tl.innerHTML='<div class="empty">會議內容中沒有「待辦事項」段落</div>';
-  g.append(tp);
+  // 最近一個有開會（且有待辦）的月份，該月所有會議的待辦事項；新的月份開會後才換月（依右上角類別篩選）
+  const lastM=MEETINGS.find(m=>m.date<=TODAY_S&&(!TYPE||m.type===TYPE)&&m.todos.length);
+  const ym=lastM?lastM.date.slice(0,7):TODAY_S.slice(0,7),tm=+ym.slice(5,7);
+  const monthMs=MEETINGS.filter(m=>m.date.startsWith(ym)&&(!TYPE||m.type===TYPE)&&m.todos.length);
+  const tp=el(`<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>${roc(+ym.slice(0,4))} 年 ${tm} 月所有會議（${monthMs.length} 場）· 依期限排序 · 點列看會議內容</p></div><div class="tbl-wrap"><table class="todo-t"><thead><tr><th class="l">期限</th><th class="l">交辦對象</th><th class="l">事項</th><th class="l">會議</th></tr></thead><tbody></tbody></table></div></section>`);
+  const items=monthMs.flatMap(m=>m.todos.map(t=>({...parseTodo(t,m.date),m}))).sort((a,b)=>a.due.localeCompare(b.due)||(a.track-b.track)||a.m.date.localeCompare(b.m.date));
+  const tb=tp.querySelector('tbody');
+  items.forEach(t=>{const tr=el(`<tr class="click"><td>${dueCell(t)}</td><td class="asg">${esc(t.who||'—')}</td><td class="l">${esc(t.task)}</td><td class="src">${typePill(t.m.type)}<br>${rocDate(t.m.date)}</td></tr>`);tr.onclick=()=>openMeeting(t.m.id);tb.append(tr)});
+  if(!items.length)tb.innerHTML=`<tr><td colspan="4" class="empty">目前會議都沒有待辦事項</td></tr>`;
+  // 各類別最新一場
+  const lp0=el('<section class="panel"><div class="panel-h"><h2>各類別最新一場會議</h2><p>點項目看會議內容</p></div><div class="hits"></div></section>');
+  tps.forEach(t=>{const m=MEETINGS.find(x=>x.type===t);const b=el(m?`<button type="button" class="hit" style="border-left-color:${typeColor(t)}"><span class="h-t">${typePill(t)} ${esc(m.title)}</span><span class="h-m">${when(m)} · 待辦 ${m.todos.length} 項${m.files.length?' · 📎'+m.files.length:''}</span></button>`:`<div class="hit" style="border-left-color:${typeColor(t)};cursor:default"><span class="h-t">${typePill(t)} <span class="note">尚無會議紀錄</span></span></div>`);if(m)b.onclick=()=>openMeeting(m.id);lp0.querySelector('.hits').append(b)});
+  g.append(lp0);
   main.append(g);
+  main.append(tp);
 
   const lp=el('<section class="panel"><div class="panel-h"><h2>最新會議</h2><p>最近 10 場</p></div></section>');
   lp.append(meetingTable(list.slice(0,10)));
@@ -291,11 +373,11 @@ function renderBoard(main){
 
 // ---------- 會議總表 ----------
 function meetingTable(rows,hl){
-  const w=el(`<div class="tbl-wrap"><table><thead><tr><th class="l" data-k="date">日期</th><th class="l" data-k="time">時間</th><th class="l" data-k="type">類別</th><th class="l" data-k="title">主題</th><th class="l">待辦</th><th class="l">附件</th></tr></thead><tbody></tbody></table></div>`);
+  const w=el(`<div class="tbl-wrap"><table><thead><tr><th class="l" data-k="date">日期</th><th class="l" data-k="type">類別</th><th class="l" data-k="title">主題</th><th class="l">待辦</th><th class="l">附件</th></tr></thead><tbody></tbody></table></div>`);
   const tb=w.querySelector('tbody');
-  if(!rows.length){tb.innerHTML='<tr><td colspan="6" class="empty">沒有符合條件的會議</td></tr>';return w}
+  if(!rows.length){tb.innerHTML='<tr><td colspan="5" class="empty">沒有符合條件的會議</td></tr>';return w}
   rows.forEach(m=>{
-    const tr=el(`<tr class="click"><td class="num">${rocDate(m.date)}（${wday(m.date)}）</td><td class="num">${esc(m.time||'—')}${m.end?'–'+esc(m.end):''}</td><td class="l">${typePill(m.type)}</td><td class="l subj"><button type="button" class="subj-a">${hlText(m.title,hl)}</button>${m.pending?'<span class="pill y">未寫入資料夾</span>':''}</td><td class="num">${m.todos.length||'—'}</td><td class="l">${attCell(m)}</td></tr>`);
+    const tr=el(`<tr class="click"><td class="num">${rocDate(m.date)}（${wday(m.date)}）</td><td class="l">${typePill(m.type)}</td><td class="l subj"><button type="button" class="subj-a">${hlText(m.title,hl)}</button>${m.pending?'<span class="pill y">未寫入資料夾</span>':''}</td><td class="num">${m.todos.length||'—'}</td><td class="l">${attCell(m)}</td></tr>`);
     tr.onclick=()=>openMeeting(m.id);tb.append(tr)});
   return w;
 }
@@ -408,14 +490,30 @@ function snippet(m,terms){
   return hit.map(l=>'… '+hlText(l.length>90?l.slice(0,90)+'…':l,terms)).join('<br>');
 }
 function renderSearch(main){
-  main.append(pageH('會議查詢','廠長會議、服務部會議一起查。每個方格是一個條件，可任意組合；結果即時更新，不受右上角年度與類別限制。','<button type="button" class="btn" id="sqClr">清除全部條件</button>'));
+  main.append(pageH('會議查詢',`${types().join('、')}一起查。每個方格是一個條件，都可以不填、也可任意組合；結果即時更新，不受右上角年度與類別限制。`,'<button type="button" class="btn" id="sqClr">清除全部條件</button>'));
+  // 建議查詢：常用組合＋會議內容的主題（### 小標）＋常見關鍵字
+  const m1=TODAY.getMonth()+1;
+  const QUICK=[
+    ['本月會議',{d1:ymd(CUR_Y,m1,1),d2:ymd(CUR_Y,m1,lastDay(CUR_Y,m1))}],
+    ['近 30 天的待辦',{scope:'todo',d1:new Date(Date.now()-30*864e5-TODAY.getTimezoneOffset()*6e4).toISOString().slice(0,10)}],
+    ...types().map(t=>[`${t}的待辦`,{types:[t],scope:'todo'}]),
+    ['有附件的會議',{att:'y'}]
+  ];
+  const topics=[...new Set(MEETINGS.flatMap(m=>[...m.content.matchAll(/^###\s+(.+)$/gm)].map(x=>x[1].trim())))].slice(0,12);
+  const words=['CSI','線上表單','定保','營收','人力','出納','褒獎','終檢','預約','改善','教育訓練','客訴','保固','零件'].filter(w=>MEETINGS.some(m=>m._hay.includes(w.toLowerCase()))&&!topics.some(t=>t.includes(w)));
+  const pz=el(`<section class="panel presets"><div class="row"><span>常用查詢</span>${QUICK.map((q,i)=>`<button type="button" class="chip" data-q="${i}">${esc(q[0])}</button>`).join('')}</div>
+    ${topics.length?`<div class="row"><span>會議主題</span>${topics.map(t=>`<button type="button" class="chip" data-k="${esc(t)}">${esc(t)}</button>`).join('')}</div>`:''}
+    ${words.length?`<div class="row"><span>關鍵字</span>${words.map(t=>`<button type="button" class="chip" data-k="${esc(t)}">${esc(t)}</button>`).join('')}</div>`:''}</section>`);
+  pz.querySelectorAll('[data-q]').forEach(b=>b.onclick=()=>{SQ={...SQ_EMPTY,types:[],...QUICK[+b.dataset.q][1]};route()});
+  pz.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{SQ={...SQ_EMPTY,types:[],kw:b.dataset.k};route()});
+  main.append(pz);
   const g=el(`<div class="qgrid">
     <section class="qbox qwide"><h3><span class="qn">1</span>關鍵字</h3><input id="sqK" placeholder="多個關鍵字以空白分隔，需全部符合；例：CSI 線上表單" value="${esc(SQ.kw)}">
       <div class="qseg">${[['all','主題＋內容＋附件檔名'],['title','只找主題'],['todo','只找待辦事項']].map(([v,t])=>`<label><input type="radio" name="sqs" value="${v}" ${SQ.scope===v?'checked':''}>${t}</label>`).join('')}</div></section>
     <section class="qbox"><h3><span class="qn">2</span>會議類別</h3><div class="seg" id="sqT">${types().map(t=>`<label><input type="checkbox" value="${esc(t)}" ${SQ.types.includes(t)?'checked':''}>${esc(t)}</label>`).join('')}</div></section>
     <section class="qbox"><h3><span class="qn">3</span>日期範圍</h3><div class="qrow"><input type="date" id="sqD1" value="${SQ.d1}"><span>～</span><input type="date" id="sqD2" value="${SQ.d2}"></div></section>
     <section class="qbox"><h3><span class="qn">4</span>附件</h3><select id="sqA"><option value="">不限</option><option value="y" ${SQ.att==='y'?'selected':''}>有附件</option><option value="n" ${SQ.att==='n'?'selected':''}>無附件</option></select></section>
-    <section class="qbox"><h3><span class="qn">5</span>出席者</h3><input id="sqW" placeholder="姓名，可部分輸入" value="${esc(SQ.who)}"></section>
+    <section class="qbox"><h3><span class="qn">5</span>出席者 <span class="note" style="font-weight:400">（選填）</span></h3><input id="sqW" placeholder="姓名，可部分輸入" value="${esc(SQ.who)}"></section>
   </div>`);
   main.append(g);
   const res=el('<section class="panel"><div class="panel-h"><h2 id="sqTitle">查詢結果</h2><p id="sqDesc"></p></div><div class="hits" id="sqBox"></div></section>');
@@ -426,7 +524,7 @@ function renderSearch(main){
     const txt=m=>SQ.scope==='title'?m.title.toLowerCase():SQ.scope==='todo'?m.todos.join('\n').toLowerCase():m._hay;
     const rows=MEETINGS.filter(m=>m.date>=d1&&m.date<=d2&&(!SQ.types.length||SQ.types.includes(m.type))
       &&(!SQ.att||(SQ.att==='y'?m.att:!m.att))&&(!who||m.who.includes(who))
-      &&kws.every(k=>txt(m).includes(k.toLowerCase())));
+      &&(SQ.scope!=='todo'||m.todos.length)&&kws.every(k=>txt(m).includes(k.toLowerCase())));
     const on=[SQ.kw.trim(),SQ.types.length,SQ.d1||SQ.d2,SQ.att,who];
     g.querySelectorAll('.qbox').forEach((c,i)=>c.classList.toggle('on',!!on[i]));
     const nOn=on.filter(Boolean).length;
@@ -436,7 +534,7 @@ function renderSearch(main){
     if(!rows.length){box.innerHTML='<div class="empty">沒有符合條件的會議</div>';return}
     rows.forEach(m=>{
       let sn='';
-      if(SQ.scope==='todo'&&kws.length)sn=m.todos.filter(t=>kws.every(k=>t.toLowerCase().includes(k.toLowerCase()))).map(t=>'☐ '+hlText(t,kws)).join('<br>');
+      if(SQ.scope==='todo')sn=m.todos.filter(t=>kws.every(k=>t.toLowerCase().includes(k.toLowerCase()))).map(t=>{const p=parseTodo(t,m.date);return `☐ ${p.dueTxt?`<b>${esc(p.dueTxt)}</b> `:''}${p.who?`<b>${hlText(p.who,kws)}</b>：`:''}${hlText(p.task,kws)}`}).join('<br>');
       else sn=snippet(m,kws);
       const b=el(`<button type="button" class="hit"><span class="h-t">${typePill(m.type)} ${hlText(m.title,kws)}</span><span class="h-m">${when(m)}${m.who?' · '+esc(m.who):''} · 待辦 ${m.todos.length} 項${m.files.length?' · 📎'+m.files.length:''}</span>${sn?`<span class="h-s">${sn}</span>`:''}</button>`);
       b.onclick=()=>go('#/m/'+encodeURIComponent(m.id)+(kws.length?'?hl='+encodeURIComponent(kws.join(' ')):''));
@@ -482,13 +580,15 @@ function renderForm(main,params,editId){
       <input name="typeOther" placeholder="請輸入會議名稱，例如：技術會議" value="${isOther?esc(m.type):''}" style="width:220px" ${isOther?'':'hidden'}>
     </div></div>
     <label>會議日期<input type="date" name="date" value="${m?m.date:TODAY_S}" required></label>
-    <label>開始時間<input type="time" name="time" value="${m?esc(m.time):''}"></label>
-    <label>結束時間<input type="time" name="end" value="${m?esc(m.end):''}"></label>
-    <label>出席者 <span class="hint">（選填）</span><input name="who" value="${m?esc(m.who):''}" placeholder="例如：各廠長、服務部主管"></label>
-    <label class="wide">會議主題<input name="title" required value="${m?esc(m.title):''}" placeholder="例如：11月廠長會議"></label>
-    <label class="wide">會議內容 <span class="hint">格式：「## 」大標題、「### 」小標題、「- 」項目（前面空兩格為子項目）；「待辦事項」段落的項目會顯示在總覽。</span>
+    <label><span>開始時間 <span class="hint">（選填）</span></span><input type="time" name="time" value="${m?esc(m.time):''}"></label>
+    <label><span>結束時間 <span class="hint">（選填）</span></span><input type="time" name="end" value="${m?esc(m.end):''}"></label>
+    <label><span>出席者 <span class="hint">（選填）</span></span><input name="who" value="${m?esc(m.who):''}" placeholder="例如：各廠長、服務部主管"></label>
+    <label class="wide">會議主題<input name="title" required value="${m?esc(m.title):''}" placeholder="例如：11月廠長會議（標題開頭若是 20261112 會自動帶入日期）"></label>
+    <label class="wide"><span>Notion 網址 <span class="hint">（選填，存成原始紀錄連結，會議內容頁可點開）</span></span><input name="src" type="url" value="${m?esc(m.src):''}" placeholder="https://app.notion.com/p/…"></label>
+    <label class="wide"><span>會議內容 <span class="hint">可直接從 Notion 複製貼上，會自動轉成標題與項目格式；也可手動輸入：「## 」大標題、「### 」小標題、「- 」項目（前面空兩格為子項目）。「待辦事項」段落會顯示在總覽。</span></span>
       <textarea name="content" class="big" placeholder="${esc(TEMPLATE)}">${m?esc(m.content):''}</textarea></label>
-    <div class="wide btn-row" style="margin-top:-6px"><button type="button" class="btn btn-xs" id="tpl">插入範本</button></div>
+    <div class="wide btn-row" style="margin-top:-6px"><button type="button" class="btn btn-xs" id="tpl">插入範本</button><button type="button" class="btn btn-xs" id="tidy">整理格式</button><button type="button" class="btn btn-xs" id="pvw">預覽</button><span class="note" id="pasteNote"></span></div>
+    <div class="wide" id="pvBox" hidden><div class="doc-paper" style="padding:16px 20px"><div class="md" id="pvMd"></div></div></div>
     <div class="wide"><div style="font-weight:600;margin-bottom:6px">是否有附件</div><div class="seg">
       <label><input type="radio" name="att" value="y" ${m&&m.att?'checked':''}>有</label><label><input type="radio" name="att" value="n" ${!m||!m.att?'checked':''}>無</label></div></div>
     <div class="wide" id="attBox" ${m&&m.att?'':'hidden'}>
@@ -503,6 +603,32 @@ function renderForm(main,params,editId){
   form.querySelectorAll('[name=type]').forEach(r=>r.onchange=()=>{other.hidden=form.type.value!=='_other';if(!other.hidden)other.focus()});
   form.querySelectorAll('[name=att]').forEach(r=>r.onchange=()=>{f.querySelector('#attBox').hidden=form.att.value!=='y'});
   f.querySelector('#tpl').onclick=()=>{const ta=form.content;ta.value=(ta.value.trim()?ta.value.replace(/\s*$/,'\n'):'')+TEMPLATE;ta.focus()};
+  // 從 Notion（或 Word、網頁）貼上：讀剪貼簿的 HTML，轉成 ## / ### / - 格式
+  const ta=form.content,pvBox=f.querySelector('#pvBox');
+  const refreshPv=()=>{if(!pvBox.hidden)f.querySelector('#pvMd').innerHTML=renderMd(ta.value)||'<p class="note">（尚無內容）</p>'};
+  ta.addEventListener('paste',e=>{
+    const html=e.clipboardData&&e.clipboardData.getData('text/html');
+    const text=e.clipboardData&&e.clipboardData.getData('text/plain');
+    const out=html?htmlToMd(html):text?tidyText(text):'';
+    if(!out)return;
+    e.preventDefault();
+    const s=ta.selectionStart,en=ta.selectionEnd;
+    ta.value=ta.value.slice(0,s)+out+ta.value.slice(en);
+    ta.selectionStart=ta.selectionEnd=s+out.length;
+    f.querySelector('#pasteNote').textContent=html?'已轉換貼上的格式，可按「預覽」確認':'已整理貼上的文字';
+    if(pvBox.hidden){pvBox.hidden=false;f.querySelector('#pvw').textContent='關閉預覽'}
+    refreshPv();
+  });
+  ta.addEventListener('input',refreshPv);
+  f.querySelector('#tidy').onclick=()=>{ta.value=tidyText(ta.value);refreshPv();toast('已整理格式')};
+  f.querySelector('#pvw').onclick=e=>{pvBox.hidden=!pvBox.hidden;e.target.textContent=pvBox.hidden?'預覽':'關閉預覽';refreshPv()};
+  // 主題開頭是 20261112 時自動帶入日期；含類別名稱時自動選類別
+  form.title.addEventListener('change',()=>{
+    const v=form.title.value,d=/^(20\d{2})(\d{2})(\d{2})/.exec(v);
+    if(d&&!m)form.date.value=`${d[1]}-${d[2]}-${d[3]}`;
+    const t=BASE_TYPES.find(x=>v.includes(x.replace('會議','')));
+    if(t&&!m){const r=form.querySelector(`[name=type][value="${t}"]`);if(r){r.checked=true;other.hidden=true}}
+  });
   let picked=[];
   const showPicked=()=>{f.querySelector('#dropList').textContent=picked.length?'待上傳：'+picked.map(x=>x.name).join('、'):'也可以先不上傳，只標示「有附件」（例如紙本資料）。'};
   f.querySelector('#mfFiles').onchange=e=>{picked=[...picked,...e.target.files];e.target.value='';showPicked()};
@@ -521,7 +647,7 @@ function renderForm(main,params,editId){
     const keepIdx=new Set([...f.querySelectorAll('.cur-files input:checked')].map(x=>+x.dataset.i));
     const kept=m?m.files.filter((x,i)=>att&&keepIdx.has(i)):[];
     const removed=m?m.files.filter(x=>!kept.includes(x)):[];
-    const rec={id,type,date,time:fd.get('time')||'',end:fd.get('end')||'',title:String(fd.get('title')).trim(),who:String(fd.get('who')||'').trim(),content:String(fd.get('content')||'').replace(/\s+$/,''),att,src:m?m.src:'',files:kept.slice()};
+    const rec={id,type,date,time:fd.get('time')||'',end:fd.get('end')||'',title:String(fd.get('title')).trim(),who:String(fd.get('who')||'').trim(),content:String(fd.get('content')||'').replace(/\s+$/,''),att,src:String(fd.get('src')||'').trim(),files:kept.slice()};
     const btn=form.querySelector('[type=submit]');btn.disabled=true;btn.textContent='儲存中…';
     try{
       const newFiles=att?picked:[];

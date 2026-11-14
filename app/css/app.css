@@ -283,3 +283,21 @@ td .pill:first-child,.doc-no .pill{margin-left:0}
 .cur-files label{display:flex;align-items:center;gap:6px;font-weight:400;font-size:13px}
 .lgd{display:inline-block;width:10px;height:10px;border-radius:2px}
 @media print{.side,.topbar,.doc-side .btn-row,.crumbs{display:none!important}.doc{display:block}.main-col{margin:0}}
+/* 勾選框／單選鈕不要套用輸入框樣式 */
+.qbox .seg input,.form .seg input[type=radio],.form .cur-files input{width:auto;padding:0;border:0;margin:0;flex:none}
+.form .seg label,.qbox .seg label{display:inline-flex;align-items:center;gap:6px;font-size:13.5px;color:var(--ink);white-space:nowrap}
+.form .seg label:has(input:checked),.qbox .seg label:has(input:checked){color:var(--accent)}
+.form .cur-files label{display:flex}
+/* 待辦事項表 */
+.todo-t td{vertical-align:top}
+.todo-t .due{white-space:nowrap;font-weight:700}
+.todo-t .due small{display:block;font-weight:400;font-size:11.5px}
+.todo-t .asg{white-space:nowrap;font-weight:600;color:var(--ink)}
+.todo-t .src{white-space:nowrap;font-size:12px;color:var(--ink-2)}
+.due.late{color:var(--crit-ink)} .due.soon{color:var(--warn-ink)} .due.none{color:var(--ink-2);font-weight:400}
+.md .todo b.who{color:var(--accent)}
+.presets{display:grid;gap:10px;margin-bottom:14px}
+.presets .row{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.presets .row>span{font-size:12.5px;font-weight:700;color:var(--ink-2);min-width:64px}
+.qbox .qrow input[type=date]{flex:1 1 0;width:auto;min-width:0;padding:7px 4px}
+.qbox>*{min-width:0}
