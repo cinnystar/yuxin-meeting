@@ -2,7 +2,7 @@
 #   不加 -Lan：只有本機 http://localhost:8791/ 可開
 #   加 -Lan  ：公司內網其他電腦可用 http://<本機IP>:8791/ 開啟（需先以系統管理員執行一次 tools\setup-lan.ps1）
 param([int]$Port = 8791, [switch]$Lan)
-$root = (Resolve-Path (Join-Path $PSScriptRoot '..\app')).Path
+$root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path   # 與網站相同：根目錄是總入口，系統在 app\
 $types = @{ '.html'='text/html; charset=utf-8'; '.js'='text/javascript; charset=utf-8'; '.css'='text/css; charset=utf-8'; '.json'='application/json';
   '.pdf'='application/pdf'; '.jpg'='image/jpeg'; '.jpeg'='image/jpeg'; '.png'='image/png'; '.gif'='image/gif'; '.txt'='text/plain; charset=utf-8';
   '.docx'='application/vnd.openxmlformats-officedocument.wordprocessingml.document'; '.xlsx'='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -26,6 +26,7 @@ try {
     try {
       $rel = [Uri]::UnescapeDataString($ctx.Request.Url.AbsolutePath).TrimStart('/')
       if (-not $rel) { $rel = 'index.html' }
+      if ($rel -match '^(\.git|tools)([/\\]|$)') { $res.StatusCode = 404; $res.Close(); continue }
       $path = [IO.Path]::GetFullPath((Join-Path $root $rel))
       if (-not $path.StartsWith($root) -or -not (Test-Path -LiteralPath $path -PathType Leaf)) { $res.StatusCode = 404; $res.Close(); continue }
       $ext = [IO.Path]::GetExtension($path).ToLower()

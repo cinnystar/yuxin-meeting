@@ -66,7 +66,7 @@ function dataJs(list){
 
 // ---------- data ----------
 // 固定類別；新增時選「其他」輸入的名稱會自動加入類別清單
-const BASE_TYPES=['廠長會議','服務部會議','改善項目會議'];
+const BASE_TYPES=['廠長會議','服務部會議','改善會議','課程會議'];
 let OFFICIAL=[],PENDING=[],MEETINGS=[];
 function norm(m,pending){
   const files=(m.files||[]).map(f=>Array.isArray(f)?{name:f[0].split('/').pop(),path:f[0],size:f[1]}:f);
@@ -85,8 +85,8 @@ function load(){
 }
 const savePending=()=>store.set('meetings.pending',PENDING.map(m=>({id:m.id,type:m.type,date:m.date,time:m.time,end:m.end,title:m.title,who:m.who,att:m.att,files:m.files,src:m.src,content:m.content})));
 const types=()=>[...new Set([...BASE_TYPES,...MEETINGS.map(m=>m.type)])];
-const typeCls=t=>{const i=types().indexOf(t);return i===0?'t1':i===1?'t2':'t3'};
-const typeColor=t=>{const i=types().indexOf(t);return i===0?'var(--s1)':i===1?'var(--s2)':'var(--s3)'};
+const typeCls=t=>{const i=types().indexOf(t);return i===0?'t1':i===1?'t2':i===2?'t3':'t4'};
+const typeColor=t=>{const i=types().indexOf(t);return i===0?'var(--s1)':i===1?'var(--s2)':i===2?'var(--s3)':'var(--s4)'};
 const typePill=t=>`<span class="pill ${typeCls(t)}">${esc(t)}</span>`;
 const years=()=>{const s=[...new Set(MEETINGS.map(m=>m.year).filter(Boolean))];if(!s.includes(CUR_Y))s.push(CUR_Y);return s.sort((a,b)=>b-a)};
 const byId=id=>MEETINGS.find(m=>m.id===id);
@@ -236,6 +236,8 @@ function route(){
   const [path,qs]=h.split('?');
   const parts=path.split('/');
   const params=new URLSearchParams(qs||'');
+  // 從總入口進來：#/board?tp=廠長會議 → 切換類別後把 tp 從網址拿掉
+  if(params.has('tp')){TYPE=params.get('tp');fillScope();params.delete('tp');const q=params.toString();history.replaceState(null,'','#/'+path+(q?'?'+q:''))}
   const main=$('#main');main.innerHTML='';tip(null);
   if(parts[0]==='m'){renderMeeting(main,decodeURIComponent(parts[1]||''));setNav('list')}
   else if(parts[0]==='edit'){$('#topTitle').textContent='編輯會議紀錄';renderForm(main,params,decodeURIComponent(parts[1]||''));setNav('new')}
@@ -330,12 +332,12 @@ async function writeMeetingFiles(m){
 function renderBoard(main){
   const list=scoped();
   const isCur=YEAR===CUR_Y,curM=TODAY.getMonth()+1;
-  main.append(pageH(`${yearLabel(YEAR)} 會議總覽`,'廠長會議與服務部會議整合在一起；右上角可切換類別與年度，點卡片、長條或主題可進入清單或會議內容。','<a class="btn" href="#/list">開啟會議總表 →</a><a class="btn btn-pri" href="#/new">＋ 新增會議紀錄</a>'));
+  main.append(pageH(`${yearLabel(YEAR)} 會議總覽`,'廠長、服務部、改善、課程會議整合在一起；右上角可切換類別與年度，點卡片、長條或主題可進入清單或會議內容。','<a class="btn" href="#/list">開啟會議總表 →</a><a class="btn btn-pri" href="#/new">＋ 新增會議紀錄</a>'));
   const pb=pendingBanner();if(pb)main.append(pb);
   const tps=types().filter(t=>!TYPE||t===TYPE);
   main.append(cards([
     {l:'會議總數',val:list.length,sub:YEAR==='all'?'全部年度':'本年度',cls:'info',go:()=>go('#/list')},
-    ...tps.slice(0,3).map((t,i)=>({l:t,val:list.filter(m=>m.type===t).length,sub:'場',cls:i===0?'info':i===1?'warn':'good',go:()=>{TYPE=t;fillScope();go('#/list')}})),
+    ...tps.slice(0,4).map((t,i)=>({l:t,val:list.filter(m=>m.type===t).length,sub:'場',cls:i===0?'info':i===1?'warn':i===2?'good':'info',go:()=>{TYPE=t;fillScope();go('#/list')}})),
     isCur?{l:`${curM} 月會議`,val:list.filter(m=>m.month===curM).length,sub:'本月',cls:'good',go:()=>go('#/list?month='+curM)}:null,
     {l:'待辦事項',val:list.reduce((s,m)=>s+m.todos.length,0),sub:'項（會議紀錄中的待辦）'}
   ].filter(Boolean)));
