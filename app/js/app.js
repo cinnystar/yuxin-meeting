@@ -122,10 +122,11 @@ function parseTodo(text,mDate){
   const my=+mDate.slice(0,4),mm=+mDate.slice(5,7);
   const yOf=m=>m<mm-6?my+1:my;
   let due='',dueTxt='';
-  let r=/(\d{1,2})月(\d{1,2})日?\s*(?:[至到~～－–-]\s*(?:(\d{1,2})月)?(\d{1,2})日?)?/.exec(task);
+  // 允許空格：「12 月 1 日」「12 月 26、27 日」
+  let r=/(\d{1,2})\s*月\s*(\d{1,2})\s*日?\s*(?:[至到~～－–\-、]\s*(?:(\d{1,2})\s*月\s*)?(\d{1,2})\s*日?)?/.exec(task);
   if(r){const m1=+r[1],d1=+r[2],m2=r[3]?+r[3]:m1,d2=r[4]?+r[4]:null;
     due=ymd(yOf(m2),m2,d2||d1);dueTxt=d2?`${m1}/${d1}–${m2!==m1?m2+'/':''}${d2}`:`${m1}/${d1}`}
-  else if((r=/(\d{1,2})月(底|初|中)/.exec(task))){const m1=+r[1],y=yOf(m1),d=r[2]==='底'?lastDay(y,m1):r[2]==='初'?5:15;due=ymd(y,m1,d);dueTxt=`${m1}月${r[2]}`}
+  else if((r=/(\d{1,2})\s*月\s*(底|初|中)/.exec(task))){const m1=+r[1],y=yOf(m1),d=r[2]==='底'?lastDay(y,m1):r[2]==='初'?5:15;due=ymd(y,m1,d);dueTxt=`${m1}月${r[2]}`}
   // 沒寫日期＝持續追蹤，期限算到會議當月月底
   let track=false;
   if(!due){track=true;const d=lastDay(my,mm);due=ymd(my,mm,d);dueTxt=`${mm}/${d}`}
