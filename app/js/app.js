@@ -101,6 +101,7 @@ function todosOf(c){
   for(const line of String(c||'').split('\n')){
     const h=/^#{2}\s+(.*)/.exec(line);
     if(h){on=/待辦|追蹤|action/i.test(h[1]);continue}
+    if(/^#\s/.test(line)){on=false;continue}
     if(/^#{3}\s/.test(line))continue;
     const li=/^- (.*)/.exec(line);
     if(on&&li)out.push(li[1].trim());
@@ -191,6 +192,8 @@ function renderMd(c,hl){
   const close=to=>{while(depth>to){html+='</li></ul>';depth--}};
   for(const raw of lines){
     if(!raw.trim()){continue}
+    const h1=/^#\s+(.*)/.exec(raw);   // # 階段（例：第一階段、第二階段）
+    if(h1){close(0);todo=false;html+=`<div class="phase">${hlText(h1[1],hl)}</div>`;continue}
     const h2=/^##\s+(.*)/.exec(raw),h3=/^###\s+(.*)/.exec(raw),li=/^(\s*)[-*•]\s+(.*)/.exec(raw);
     if(h3){close(0);html+=`<h3>${hlText(h3[1],hl)}</h3>`;continue}
     if(h2&&!h3){close(0);todo=/待辦|追蹤|action/i.test(h2[1]);html+=`<h2>${hlText(h2[1],hl)}</h2>`;continue}
