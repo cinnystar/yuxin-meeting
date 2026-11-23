@@ -86,7 +86,7 @@ function load(){
 const savePending=()=>store.set('meetings.pending',PENDING.map(m=>({id:m.id,type:m.type,date:m.date,time:m.time,end:m.end,title:m.title,who:m.who,att:m.att,files:m.files,src:m.src,content:m.content})));
 const types=()=>[...new Set([...BASE_TYPES,...MEETINGS.map(m=>m.type)])];
 const typeCls=t=>{const i=types().indexOf(t);return i===0?'t1':i===1?'t2':i===2?'t3':'t4'};
-const typeColor=t=>{const i=types().indexOf(t);return i===0?'var(--s1)':i===1?'var(--s2)':i===2?'var(--s3)':'var(--s4)'};
+const typeColor=t=>{const i=types().indexOf(t);return 'var(--k'+Math.min(i+1,4)+')'};
 const typePill=t=>`<span class="pill ${typeCls(t)}">${esc(t)}</span>`;
 const years=()=>{const s=[...new Set(MEETINGS.map(m=>m.year).filter(Boolean))];if(!s.includes(CUR_Y))s.push(CUR_Y);return s.sort((a,b)=>b-a)};
 const byId=id=>MEETINGS.find(m=>m.id===id);
@@ -337,7 +337,7 @@ function renderBoard(main){
   const tps=types().filter(t=>!TYPE||t===TYPE);
   main.append(cards([
     {l:'會議總數',val:list.length,sub:YEAR==='all'?'全部年度':'本年度',cls:'info',go:()=>go('#/list')},
-    ...tps.slice(0,4).map((t,i)=>({l:t,val:list.filter(m=>m.type===t).length,sub:'場',cls:i===0?'info':i===1?'warn':i===2?'good':'info',go:()=>{TYPE=t;fillScope();go('#/list')}})),
+    ...tps.slice(0,4).map((t,i)=>({l:t,val:list.filter(m=>m.type===t).length,sub:'場',cls:'k'+(types().indexOf(t)+1),go:()=>{TYPE=t;fillScope();go('#/list')}})),
     isCur?{l:`${curM} 月會議`,val:list.filter(m=>m.month===curM).length,sub:'本月',cls:'good',go:()=>go('#/list?month='+curM)}:null,
     {l:'待辦事項',val:list.reduce((s,m)=>s+m.todos.length,0),sub:'項（會議紀錄中的待辦）'}
   ].filter(Boolean)));
