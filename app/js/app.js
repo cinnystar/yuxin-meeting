@@ -114,6 +114,10 @@ function parseTodo(text,mDate){
   let who='',task=text;
   const w=/^([^：:]{1,14})[：:]\s*(.+)$/.exec(text);
   if(w){who=w[1].trim();task=w[2].trim()}
+  // 「（負責人未明確指定）」是 Notion 的附註，拿掉；有寫對象就照對象，沒寫才算未指定
+  task=task.replace(/\s*[（(]\s*負責人未(?:明確)?指定\s*[)）]/,'').trim();
+  // 多個對象拆開：「濱江、北投、汐止」「各廠長與主管」
+  const whoList=who?who.split(/\s*(?:[、,，\/／]|及|與|和)\s*/).filter(Boolean):[];
   const my=+mDate.slice(0,4),mm=+mDate.slice(5,7);
   const yOf=m=>m<mm-6?my+1:my;
   let due='',dueTxt='';
@@ -124,8 +128,9 @@ function parseTodo(text,mDate){
   // 沒寫日期＝持續追蹤，期限算到會議當月月底
   let track=false;
   if(!due){track=true;const d=lastDay(my,mm);due=ymd(my,mm,d);dueTxt=`${mm}/${d}`}
-  return {who,task,due,dueTxt,track};
+  return {who,whoList,task,due,dueTxt,track};
 }
+const asgTags=t=>t.whoList.length?t.whoList.map(x=>`<span class="asg-tag">${esc(x)}</span>`).join(''):'<span class="asg-tag none">未指定</span>';
 function dueCell(t){
   return `<span class="due">${esc(t.dueTxt)}${t.track?'<small>持續追蹤</small>':''}</span>`;
 }
@@ -359,11 +364,25 @@ function renderBoard(main){
   const lastM=MEETINGS.find(m=>m.date<=TODAY_S&&(!TYPE||m.type===TYPE)&&m.todos.length);
   const ym=lastM?lastM.date.slice(0,7):TODAY_S.slice(0,7),tm=+ym.slice(5,7);
   const monthMs=MEETINGS.filter(m=>m.date.startsWith(ym)&&(!TYPE||m.type===TYPE)&&m.todos.length);
-  const tp=el(`<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>${roc(+ym.slice(0,4))} 年 ${tm} 月所有會議（${monthMs.length} 場）· 依期限排序 · 點列看會議內容</p></div><div class="tbl-wrap"><table class="todo-t"><thead><tr><th class="l">期限</th><th class="l">交辦對象</th><th class="l">事項</th><th class="l">會議</th></tr></thead><tbody></tbody></table></div></section>`);
+  const tp=el(`<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>${roc(+ym.slice(0,4))} 年 ${tm} 月所有會議（${monthMs.length} 場）· 依期限排序 · 點列看會議內容</p></div><div class="asg-bar"></div><div class="tbl-wrap"><table class="todo-t"><thead><tr><th class="l">期限</th><th class="l">交辦對象</th><th class="l">事項</th><th class="l">會議</th></tr></thead><tbody></tbody></table></div></section>`);
   const items=monthMs.flatMap(m=>m.todos.map(t=>({...parseTodo(t,m.date),m}))).sort((a,b)=>a.due.localeCompare(b.due)||(a.track-b.track)||a.m.date.localeCompare(b.m.date));
   const tb=tp.querySelector('tbody');
-  items.forEach(t=>{const tr=el(`<tr class="click"><td>${dueCell(t)}</td><td class="l asg">${esc(t.who||'—')}</td><td class="l">${esc(t.task)}</td><td class="l src">${typePill(t.m.type)}<br>${rocDate(t.m.date)}</td></tr>`);tr.onclick=()=>openMeeting(t.m.id);tb.append(tr)});
-  if(!items.length)tb.innerHTML=`<tr><td colspan="4" class="empty">目前會議都沒有待辦事項</td></tr>`;
+  // 交辦對象篩選：點對象只看他的待辦
+  const keyOf=t=>t.whoList.length?t.whoList:['未指定'];
+  const cnt={};items.forEach(t=>keyOf(t).forEach(k=>cnt[k]=(cnt[k]||0)+1));
+  const bar=tp.querySelector('.asg-bar');let pick='';
+  const drawRows=()=>{
+    tb.innerHTML='';
+    items.filter(t=>!pick||keyOf(t).includes(pick)).forEach(t=>{const tr=el(`<tr class="click"><td>${dueCell(t)}</td><td class="l asg">${asgTags(t)}</td><td class="l">${esc(t.task)}</td><td class="l src">${typePill(t.m.type)}<br>${rocDate(t.m.date)}</td></tr>`);tr.onclick=()=>openMeeting(t.m.id);tb.append(tr)});
+    if(!items.length)tb.innerHTML=`<tr><td colspan="4" class="empty">目前會議都沒有待辦事項</td></tr>`;
+    bar.querySelectorAll('button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.k===pick));
+  };
+  if(items.length){
+    const ks=Object.keys(cnt).sort((a,b)=>(a==='未指定')-(b==='未指定')||cnt[b]-cnt[a]);
+    bar.innerHTML='<span class="asg-l">交辦對象</span>'+[['',items.length,'全部'],...ks.map(k=>[k,cnt[k],k])].map(([k,n,l])=>`<button type="button" data-k="${esc(k)}" class="${k==='未指定'?'none':''}">${esc(l)}<b>${n}</b></button>`).join('');
+    bar.onclick=e=>{const b=e.target.closest('button');if(!b)return;pick=b.dataset.k;drawRows()};
+  }else bar.remove();
+  drawRows();
   // 各類別最新一場
   const lp0=el('<section class="panel"><div class="panel-h"><h2>各類別最新一場會議</h2><p>點項目看會議內容</p></div><div class="hits"></div></section>');
   tps.forEach(t=>{const m=MEETINGS.find(x=>x.type===t);const b=el(m?`<button type="button" class="hit" style="border-left-color:${typeColor(t)}"><span class="h-t">${typePill(t)} ${esc(m.title)}</span><span class="h-m">${when(m)} · 待辦 ${m.todos.length} 項${m.files.length?' · 📎'+m.files.length:''}</span></button>`:`<div class="hit" style="border-left-color:${typeColor(t)};cursor:default"><span class="h-t">${typePill(t)} <span class="note">尚無會議紀錄</span></span></div>`);if(m)b.onclick=()=>openMeeting(m.id);lp0.querySelector('.hits').append(b)});
