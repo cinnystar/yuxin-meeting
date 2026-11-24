@@ -49,7 +49,7 @@ main{max-width:960px;margin:0 auto;padding:28px 16px 40px}
 <script src="app/data/meetings.js"></script>
 <script>
 // 四個類別名稱需與 app/js/app.js 的 BASE_TYPES 相同
-var T=[['廠長會議','var(--s1)'],['服務部會議','var(--s2)'],['改善會議','var(--s3)'],['課程會議','var(--s4)']];
+var T=[['廠長會議','var(--s1)'],['服務部會議','var(--s2)'],['課程會議','var(--s4)'],['改善會議','var(--s3)']];
 var D=window.MEETING_DATA||[];
 document.getElementById('grid').innerHTML=T.map(function(t,i){
   var ms=D.filter(function(m){return m.type===t[0]}).sort(function(a,b){return b.date<a.date?-1:1});
