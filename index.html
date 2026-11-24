@@ -27,7 +27,13 @@ main{max-width:960px;margin:0 auto;padding:28px 16px 40px}
 .tile .n{font-family:Manrope,sans-serif;font-weight:800;font-size:40px;line-height:1;color:var(--ink)}
 .tile .n small{font-family:"Noto Sans TC",sans-serif;font-size:14px;font-weight:500;color:var(--muted);margin-left:4px}
 .tile .go{font-weight:700;color:var(--c);white-space:nowrap}
-.all{display:block;margin:24px auto 0;width:max-content;max-width:100%;color:var(--muted);font-size:14px}
+.all{display:flex;align-items:center;justify-content:space-between;gap:16px;width:min(360px,100%);margin:24px auto 0;padding:16px 20px;
+  background:var(--panel);border:1px solid var(--line);border-top:5px solid var(--side);border-radius:12px;color:inherit;text-decoration:none;
+  box-shadow:0 1px 2px rgba(20,33,58,.06);transition:transform .15s,box-shadow .15s}
+.all:hover,.all:focus-visible{transform:translateY(-3px);box-shadow:0 10px 24px rgba(20,33,58,.12);outline:none}
+.all h2{margin:0;font-size:20px;font-weight:700}
+.all .sub{margin-top:4px;color:var(--muted);font-size:13px}
+.all .go{font-weight:700;color:var(--side);white-space:nowrap}
 @media (max-width:640px){.grid{grid-template-columns:1fr;gap:14px}.tile{min-height:150px;padding:20px}.tile h2{font-size:26px}.tile .n{font-size:32px}}
 </style>
 </head>
@@ -38,7 +44,7 @@ main{max-width:960px;margin:0 auto;padding:28px 16px 40px}
 </header>
 <main>
   <div class="grid" id="grid"></div>
-  <a class="all" href="app/index.html#/board?tp=">查看全部會議 →</a>
+  <a class="all" id="all" href="app/index.html#/board?tp="><div><h2>查看全部會議</h2><div class="sub" id="allSub"></div></div><span class="go">進入 →</span></a>
 </main>
 <script src="app/data/meetings.js"></script>
 <script>
@@ -52,6 +58,8 @@ document.getElementById('grid').innerHTML=T.map(function(t,i){
     '<div><div class="no">0'+(i+1)+'</div><h2>'+t[0]+'</h2></div>'+
     '<div class="meta"><div><div class="n">'+ms.length+'<small>場</small></div><div>'+last+'</div></div><span class="go">進入 →</span></div></a>';
 }).join('');
+var ds=D.map(function(m){return m.date}).sort();
+document.getElementById("allSub").textContent="共 "+D.length+" 場"+(ds.length?"・最近一場 "+ds[ds.length-1].replace(/-/g,"/"):"");
 </script>
 </body>
 </html>
