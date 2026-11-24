@@ -111,10 +111,12 @@ function todosOf(c){
 // 待辦拆解：「各廠長：11月13日內完成…」→ 交辦對象、期限（取最後一天）、事項
 const ymd=(y,m,d)=>`${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
 const lastDay=(y,m)=>new Date(y,m,0).getDate();
-function parseTodo(text,mDate){
+function parseTodo(text,mDate,mType){
   let who='',task=text;
   const w=/^([^：:]{1,14})[：:]\s*(.+)$/.exec(text);
   if(w){who=w[1].trim();task=w[2].trim()}
+  // 廠長會議沒寫交辦對象的，一律歸給「各廠長」
+  if(!who&&mType==='廠長會議')who='各廠長';
   // 「（負責人未明確指定）」是 Notion 的附註，拿掉；有寫對象就照對象，沒寫才算未指定
   task=task.replace(/\s*[（(]\s*負責人未(?:明確)?指定\s*[)）]/,'').trim();
   // 多個對象拆開：「濱江、北投、汐止」「各廠長與主管」
@@ -369,7 +371,7 @@ function renderBoard(main){
   const ym=lastM?lastM.date.slice(0,7):TODAY_S.slice(0,7),tm=+ym.slice(5,7);
   const monthMs=MEETINGS.filter(m=>m.date.startsWith(ym)&&(!TYPE||m.type===TYPE)&&m.todos.length);
   const tp=el(`<section class="panel"><div class="panel-h"><h2>最近會議的待辦事項</h2><p>${roc(+ym.slice(0,4))} 年 ${tm} 月所有會議（${monthMs.length} 場）· 依期限排序 · 點列看會議內容</p></div><div class="asg-bar"></div><div class="tbl-wrap"><table class="todo-t"><thead><tr><th class="l">期限</th><th class="l">交辦對象</th><th class="l">事項</th><th class="l">會議</th></tr></thead><tbody></tbody></table></div></section>`);
-  const items=monthMs.flatMap(m=>m.todos.map(t=>({...parseTodo(t,m.date),m}))).sort((a,b)=>a.due.localeCompare(b.due)||(a.track-b.track)||a.m.date.localeCompare(b.m.date));
+  const items=monthMs.flatMap(m=>m.todos.map(t=>({...parseTodo(t,m.date,m.type),m}))).sort((a,b)=>a.due.localeCompare(b.due)||(a.track-b.track)||a.m.date.localeCompare(b.m.date));
   const tb=tp.querySelector('tbody');
   // 交辦對象篩選：點對象只看他的待辦
   const keyOf=t=>t.whoList.length?t.whoList:['未指定'];
@@ -559,7 +561,7 @@ function renderSearch(main){
     if(!rows.length){box.innerHTML='<div class="empty">沒有符合條件的會議</div>';return}
     rows.forEach(m=>{
       let sn='';
-      if(SQ.scope==='todo')sn=m.todos.filter(t=>kws.every(k=>t.toLowerCase().includes(k.toLowerCase()))).map(t=>{const p=parseTodo(t,m.date);return `☐ ${p.dueTxt?`<b>${esc(p.dueTxt)}</b> `:''}${p.who?`<b>${hlText(p.who,kws)}</b>：`:''}${hlText(p.task,kws)}`}).join('<br>');
+      if(SQ.scope==='todo')sn=m.todos.filter(t=>kws.every(k=>t.toLowerCase().includes(k.toLowerCase()))).map(t=>{const p=parseTodo(t,m.date,m.type);return `☐ ${p.dueTxt?`<b>${esc(p.dueTxt)}</b> `:''}${p.who?`<b>${hlText(p.who,kws)}</b>：`:''}${hlText(p.task,kws)}`}).join('<br>');
       else sn=snippet(m,kws);
       const b=el(`<button type="button" class="hit"><span class="h-t">${typePill(m.type)} ${hlText(m.title,kws)}</span><span class="h-m">${when(m)}${m.who?' · '+esc(m.who):''} · 待辦 ${m.todos.length} 項${m.files.length?' · 📎'+m.files.length:''}</span>${sn?`<span class="h-s">${sn}</span>`:''}</button>`);
       b.onclick=()=>go('#/m/'+encodeURIComponent(m.id)+(kws.length?'?hl='+encodeURIComponent(kws.join(' ')):''));
