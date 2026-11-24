@@ -72,12 +72,12 @@ button.card:hover{border-color:var(--accent)}
 .card .lbl{font-size:12.5px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
 .card .val{font-size:28px;font-weight:700;line-height:1.15;color:var(--top)}
 .card .sub{font-size:12px;color:var(--muted)}
-.card.crit{border-top:3px solid var(--crit)} .card.warn{border-top:3px solid var(--warn)} .card.info{border-top:3px solid var(--s1)} .card.good{border-top:3px solid var(--good)}
+.card.crit{border-top:6px solid var(--crit)} .card.warn{border-top:6px solid var(--warn)} .card.info{border-top:6px solid var(--s1)} .card.good{border-top:6px solid var(--good)}
 .dot{width:8px;height:8px;border-radius:50%;background:var(--c);flex:none;display:inline-block}
 
 /* alerts */
 .alerts{display:grid;gap:8px}
-.alert{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:4px solid var(--sev);border-radius:8px;padding:10px 14px;cursor:pointer;text-align:left;width:100%}
+.alert{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;background:var(--panel);border:1px solid var(--line);border-left:6px solid var(--sev);border-radius:8px;padding:10px 14px;cursor:pointer;text-align:left;width:100%}
 .alert:hover{border-color:var(--line-2);border-left-color:var(--sev)}
 .alert .tag{font-size:11.5px;font-weight:700;letter-spacing:.06em;color:var(--sev-ink);white-space:nowrap}
 .alert .go{color:var(--accent);font-size:12.5px;white-space:nowrap}
@@ -217,7 +217,7 @@ mark{background:#fff1b8;color:inherit;border-radius:2px;padding:0 1px}
 .msg.me .bubble{background:var(--accent);color:#fff}
 .bubble p{margin:0 0 6px}.bubble p:last-child{margin:0}
 .hits{display:grid;gap:6px;margin-top:8px}
-.hit{display:grid;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--s1);border-radius:8px;padding:8px 12px;cursor:pointer;width:100%}
+.hit{display:grid;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--s1);border-radius:8px;padding:8px 12px;cursor:pointer;width:100%}
 .hit:hover{border-color:var(--accent);border-left-color:var(--accent)}
 .hit .h-t{font-weight:600;color:var(--ink)}
 .hit .h-m{font-size:12px;color:var(--muted)}
@@ -266,7 +266,7 @@ td .pill:first-child,.doc-no .pill{margin-left:0}
 .md .todo>li{position:relative;padding-left:26px}
 .md .todo>li::before{content:"";position:absolute;left:2px;top:.42em;width:13px;height:13px;border:2px solid var(--s2);border-radius:3px}
 .todos{display:grid;gap:6px}
-.todo-i{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:3px solid var(--s2);border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;color:inherit;width:100%}
+.todo-i{display:grid;grid-template-columns:auto 1fr;gap:4px 10px;align-items:start;text-align:left;background:var(--panel);border:1px solid var(--line);border-left:5px solid var(--s2);border-radius:8px;padding:8px 12px;cursor:pointer;font:inherit;color:inherit;width:100%}
 .todo-i:hover{border-color:var(--accent)}
 .todo-i .m{grid-column:2;font-size:12px;color:var(--ink-3,#6b7785)}
 .seg{display:flex;flex-wrap:wrap;gap:6px}
@@ -305,7 +305,7 @@ td .pill:first-child,.doc-no .pill{margin-left:0}
 @media (max-width:960px){.grid2.half{grid-template-columns:1fr}}
 .brand-home{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px;padding:9px 12px;border-radius:8px;background:#fff;color:var(--side);font-size:14px;font-weight:700;text-decoration:none;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:background .15s,transform .15s}
 .brand-home:hover,.brand-home:focus-visible{background:#ffd84d;transform:translateY(-1px);outline:none}
-.card.k1{border-top:3px solid var(--k1)} .card.k2{border-top:3px solid var(--k2)} .card.k3{border-top:3px solid var(--k3)} .card.k4{border-top:3px solid var(--k4)}
+.card.k1{border-top:6px solid var(--k1)} .card.k2{border-top:6px solid var(--k2)} .card.k3{border-top:6px solid var(--k3)} .card.k4{border-top:6px solid var(--k4)}
 .asg-tag{display:inline-block;margin:1px 4px 1px 0;padding:2px 9px;border-radius:999px;background:#eef3fb;border:1px solid #cddbf0;color:#1d3a66;font-size:13px;font-weight:700;white-space:nowrap}
 .asg-tag.none{background:#fff4e5;border-color:#f3cf9c;color:#9a5a00;font-weight:600}
 .asg-bar{display:flex;flex-wrap:wrap;align-items:center;gap:6px;padding:0 16px 12px}
